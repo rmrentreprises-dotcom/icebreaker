@@ -1,0 +1,130 @@
+{
+  "theme_and_archetype": {
+    "theme": "LIGHT (Primary) / DARK (Premium)",
+    "archetype": "Archetype 4 (Swiss & High-Contrast) for Light Mode, Archetype 5 (Jewel & Luxury) for Premium Mode",
+    "reasoning": "A bold, confident, and modern aesthetic that evokes conversation and connection without feeling cheesy. High contrast and Swiss structure give it a premium utility feel, while the luxury dark mode elevates the premium paywall."
+  },
+  "typography": {
+    "strategy": "The 'Swiss Brutalist' pair",
+    "headings": {
+      "font_family": "Outfit, sans-serif",
+      "weights": ["font-bold", "font-black"],
+      "tracking": "tracking-tight",
+      "rules": "Never use Inter for headings. Use tight letter spacing."
+    },
+    "body": {
+      "font_family": "Manrope, sans-serif",
+      "weights": ["font-regular", "font-medium"],
+      "leading": "leading-relaxed"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl",
+      "h2": "text-2xl sm:text-3xl",
+      "h3": "text-xl sm:text-2xl",
+      "body": "text-base",
+      "small": "text-sm",
+      "labels": "text-xs uppercase tracking-[0.2em]"
+    }
+  },
+  "colors": {
+    "light_mode": {
+      "background": "#F8F9FA",
+      "surface": "#FFFFFF",
+      "text_primary": "#0A0A0B",
+      "text_secondary": "#52525B",
+      "accent": "#FF5A36",
+      "border": "#E4E4E7"
+    },
+    "dark_mode": {
+      "background": "#0A0A0B",
+      "surface": "#18181B",
+      "text_primary": "#FFFFFF",
+      "text_secondary": "#A1A1AA",
+      "accent": "#FF5A36",
+      "border": "#27272A"
+    },
+    "rules": "Tinted greys only. Use Spark Orange/Coral (#FF5A36) for primary actions. DO NOT use Purple or Teal. Ensure 4.5:1 contrast."
+  },
+  "spacing_and_layout": {
+    "philosophy": "Mobile-first, generous spacing. Thumb-friendly navigation.",
+    "scale": "p-4, p-6, p-8 for inner cards. pb-24 for content above tab bar to prevent overlap.",
+    "grid": "Bento Grid for categories (Home Screen) - grid-cols-2 with span variations.",
+    "alignment": "Left-align dense text and chat inputs. Center-align premium/paywall content."
+  },
+  "components": {
+    "navigation": {
+      "type": "Bottom Tab Bar",
+      "style": "Floating glassmorphism (backdrop-blur-xl bg-white/70 or bg-black/60). 1px subtle inner border.",
+      "icons": "lucide-react-native"
+    },
+    "cards": {
+      "daily_icebreaker": "Large swipeable card, taking 60vh. Neumorphic or sharp edges with bold typography. Must have data-testid='daily-card'.",
+      "category_item": "Bento style. Image background with bg-black/40 overlay. White text, bottom-left aligned."
+    },
+    "chat_interface": {
+      "layout": "Bottom input field + recent history at top. Actions on right.",
+      "ai_response": "Title size (text-2xl), font-bold for the main icebreaker line. Subtle 14pt for context.",
+      "user_bubble": "Neutral background, standard body text."
+    },
+    "paywall": {
+      "style": "Full screen, dark mode (Archetype 5). Uses luxury dark texture background.",
+      "cta": "Large bold button, Spark Orange. text-xl font-bold. width full."
+    },
+    "buttons": {
+      "primary": "Solid Spark Orange, white text. Hover/Active: lighter hue.",
+      "secondary": "Outline with 1px border, high contrast text."
+    }
+  },
+  "motion": {
+    "gestures": "Swipe to dismiss/save icebreakers.",
+    "transitions": "Smooth spring animations for tab switching and chat bubble entrance.",
+    "accessibility": "Respect prefers-reduced-motion."
+  },
+  "media_urls": {
+    "onboarding_bg": {
+      "url": "https://images.unsplash.com/photo-1753351051905-8b341bdbd3aa?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwzfHxmcmllbmRzJTIwbGF1Z2hpbmclMjBjYWZlfGVufDB8fHx8MTc3ODE4OTk2MHww&ixlib=rb-4.1.0&q=85",
+      "description": "Friends laughing and sharing pizza, representing social connection",
+      "category": "onboarding"
+    },
+    "category_club": {
+      "url": "https://images.unsplash.com/photo-1597320775230-cca0c1954f20?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwxfHxuZW9uJTIwbmlnaHRjbHViJTIwaW50ZXJpb3J8ZW58MHx8fHwxNzc4MTg5OTgxfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Neon sign in a nightclub",
+      "category": "home_categories"
+    },
+    "category_beach": {
+      "url": "https://images.unsplash.com/photo-1697809311064-c7a3852206ee?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHxiZWFjaCUyMHN1bnNldCUyMG9jZWFufGVufDB8fHx8MTc3ODE4OTk4MXww&ixlib=rb-4.1.0&q=85",
+      "description": "Sun setting over the beach",
+      "category": "home_categories"
+    },
+    "category_cafe": {
+      "url": "https://images.pexels.com/photos/16266201/pexels-photo-16266201.jpeg",
+      "description": "Moody urban cafe interior",
+      "category": "home_categories"
+    },
+    "paywall_bg": {
+      "url": "https://images.unsplash.com/photo-1760224254117-7a40f7f03fe2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzJ8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBkYXJrJTIwdGV4dHVyZXxlbnwwfHx8fDE3NzgxODk5ODF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark luxury fabric texture",
+      "category": "paywall"
+    }
+  },
+  "testing_attributes": {
+    "rule": "All interactive elements must include 'data-testid'",
+    "examples": [
+      "data-testid='login-email-input'",
+      "data-testid='daily-card-swipe'",
+      "data-testid='chat-send-button'",
+      "data-testid='paywall-subscribe-button'",
+      "data-testid='tab-home'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build a mobile-first layout. Since it's a React Native Expo app (or mobile-web approximation), use NativeWind or standard Tailwind CSS utilities suitable for small screens.",
+    "Implement the bottom tab bar with glassmorphism (backdrop-blur-xl). Must ensure padding-bottom on main scroll views so content isn't hidden by the floating tab bar.",
+    "For the AI Chat screen, place the user input field fixed at the bottom with a clear send icon, displaying chat history above. Reverse column direction for natural chat scroll.",
+    "Apply 'Outfit' or a similar bold Sans-Serif font for Headings. DO NOT use generic 'Inter' for display text.",
+    "Images for category cards (Club, Beach, Cafe) must use a bg-black/40 overlay mask to ensure white text remains readable.",
+    "The Paywall screen should feel highly premium: use dark mode, full screen luxury texture background, high-contrast text, and a bold Spark Orange CTA button.",
+    "Ensure UI accommodates both EN and FR string lengths (allow wrapping where necessary).",
+    "Do not use emojis for icons. Use lucide-react-native."
+  ]
+}
