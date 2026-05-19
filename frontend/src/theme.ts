@@ -2,6 +2,31 @@
  * App-wide constants: theme, fonts, API helper, i18n strings.
  */
 import { Platform } from "react-native";
+import * as Localization from "expo-localization";
+
+/**
+ * Detect the device's preferred language.
+ * Returns "fr" if any of the user's locales starts with "fr", otherwise "en".
+ * (Spec: French device → French; everything else → English.)
+ */
+export function getDeviceLanguage(): "en" | "fr" {
+  try {
+    const locales = Localization.getLocales?.() || [];
+    for (const l of locales) {
+      const tag = (l.languageTag || l.languageCode || "").toLowerCase();
+      if (tag.startsWith("fr")) return "fr";
+    }
+    // Fallback path: try Intl on web / older runtimes
+    const fallback =
+      (typeof Intl !== "undefined" &&
+        Intl.DateTimeFormat().resolvedOptions().locale) ||
+      "";
+    if (fallback.toLowerCase().startsWith("fr")) return "fr";
+  } catch {
+    // ignore - default to english
+  }
+  return "en";
+}
 
 export const COLORS = {
   background: "#F8F9FA",
@@ -62,7 +87,7 @@ export const STRINGS = {
     dailySubtitle: "Your free icebreaker for today",
     categories: "Pick a setting",
     aiTitle: "Live AI Assistant",
-    aiSubtitle: "Describe the scene. Get 5 perfect lines.",
+    aiSubtitle: "Describe the scene. Get the best lines.",
     contextPlaceholder:
       "e.g. We're 2 Canadians on vacation, want to approach 3 girls at the beach. One is wearing a black hat...",
     locationPlaceholder: "Location (optional): beach, café, club...",
@@ -126,7 +151,7 @@ export const STRINGS = {
     dailySubtitle: "Votre icebreaker gratuit du jour",
     categories: "Choisis un lieu",
     aiTitle: "Assistant IA en direct",
-    aiSubtitle: "Décris la scène. Reçois 5 lignes parfaites.",
+    aiSubtitle: "Décris la scène. Reçois les meilleures lignes.",
     contextPlaceholder:
       "ex. On est 2 Canadiens en vacances, on veut aborder 3 filles à la plage. L'une porte un chapeau noir...",
     locationPlaceholder: "Lieu (optionnel) : plage, café, club...",

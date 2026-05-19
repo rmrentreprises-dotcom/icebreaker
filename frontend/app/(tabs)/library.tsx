@@ -65,6 +65,7 @@ export default function LibraryScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsRow}
+        style={styles.chipsScroll}
       >
         <Chip
           label={t.all}
@@ -90,6 +91,7 @@ export default function LibraryScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chipsRow}
+        style={styles.chipsScroll}
       >
         <Chip
           label={t.all}
@@ -200,6 +202,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 32, fontWeight: "900", color: COLORS.textPrimary, letterSpacing: -1.2 },
   chipsRow: { paddingHorizontal: 20, gap: 8, paddingVertical: 8 },
+  chipsScroll: { flexGrow: 0, flexShrink: 0 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,

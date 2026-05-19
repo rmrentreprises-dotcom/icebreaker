@@ -20,7 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Sparkles, Globe, ArrowRight, Mail, Lock, User as UserIcon } from "lucide-react-native";
-import { COLORS, STRINGS, Lang } from "../src/theme";
+import { COLORS, STRINGS, Lang, getDeviceLanguage } from "../src/theme";
 import { useAuth } from "../src/auth";
 
 type Mode = "welcome" | "signup" | "signin";
@@ -29,7 +29,7 @@ export default function Index() {
   const router = useRouter();
   const { user, loading, signInGuest, signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("welcome");
-  const [language, setLanguage] = useState<Lang>("en");
+  const [language, setLanguage] = useState<Lang>(getDeviceLanguage());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
