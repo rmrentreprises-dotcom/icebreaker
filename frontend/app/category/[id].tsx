@@ -19,11 +19,16 @@ import { COLORS, STRINGS, CATEGORY_IMAGES } from "../../src/theme";
 import { useAuth } from "../../src/auth";
 import { api } from "../../src/api";
 import { IcebreakerCard } from "../../src/IcebreakerCard";
+import { usePaywall } from "../../src/usePaywall";
+
+const SAMPLES_PER_CATEGORY = 3;
 
 export default function CategoryDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { language } = useAuth();
+  const { user, language } = useAuth();
+  const { open: openPaywall } = usePaywall();
+  const isPremium = !!user?.is_premium;
   const insets = useSafeAreaInsets();
   const t = STRINGS[language];
   const [items, setItems] = useState<any[]>([]);
@@ -130,18 +135,23 @@ export default function CategoryDetail() {
               {language === "fr" ? "Aucune ligne pour ce filtre." : "No lines for this filter."}
             </Text>
           ) : (
-            items.map((it) => (
-              <IcebreakerCard
-                key={it.id}
-                text={it.text}
-                tone={it.tone}
-                category={it.category}
-                language={it.language}
-                source="library"
-                language_ui={language}
-                testID={`cat-card-${it.id}`}
-              />
-            ))
+            items.map((it, idx) => {
+              const locked = !isPremium && idx >= SAMPLES_PER_CATEGORY;
+              return (
+                <IcebreakerCard
+                  key={it.id}
+                  text={it.text}
+                  tone={it.tone}
+                  category={it.category}
+                  language={it.language}
+                  source="library"
+                  language_ui={language}
+                  locked={locked}
+                  onLockedPress={() => openPaywall({ source: `cat_${id}` })}
+                  testID={`cat-card-${it.id}`}
+                />
+              );
+            })
           )}
         </ScrollView>
       </View>

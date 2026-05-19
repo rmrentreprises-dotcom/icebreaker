@@ -24,8 +24,10 @@ import { X, Crown, Check, Sparkles, Infinity as InfinityIcon, Image as ImageIcon
 import { COLORS, STRINGS, Lang } from "../src/theme";
 import { useAuth } from "../src/auth";
 import { api } from "../src/api";
+import { usePaywall } from "../src/usePaywall";
 
 type Plan = "weekly" | "yearly" | "lifetime";
+type Variant = "default" | "sheet" | "discount";
 
 const PLAN_META: Record<Plan, { price: string; sub_en: string; sub_fr: string; badge?: string }> = {
   weekly: {
@@ -46,11 +48,22 @@ const PLAN_META: Record<Plan, { price: string; sub_en: string; sub_fr: string; b
   },
 };
 
+const WEEKLY_PROMO_META = {
+  price: "$4.99",
+  strike: "$6.99",
+  sub_en: "per week · 3-day trial · 24h offer",
+  sub_fr: "par semaine · essai 3 jours · offre 24h",
+};
+
 export default function Paywall() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ session_id?: string; lang?: string; from?: string }>();
+  const params = useLocalSearchParams<{ session_id?: string; lang?: string; from?: string; variant?: string }>();
   const { user, language: ctxLang, refresh } = useAuth();
+  const { resetEscalation } = usePaywall();
   const language: Lang = (params.lang === "fr" ? "fr" : params.lang === "en" ? "en" : ctxLang) as Lang;
+  const variant: Variant = (params.variant === "sheet" || params.variant === "discount" ? params.variant : "default") as Variant;
+  const isDiscount = variant === "discount";
+  const isSheet = variant === "sheet";
   const t = STRINGS[language];
 
   const [plan, setPlan] = useState<Plan>("yearly");
@@ -66,6 +79,7 @@ export default function Paywall() {
         try {
           const r = await api.checkoutStatus(sid as string);
           if (r.payment_status === "paid") {
+            await resetEscalation();
             await refresh();
             router.replace("/(tabs)/home");
           }
@@ -90,7 +104,9 @@ export default function Paywall() {
     }
     setBusy(true);
     try {
-      const r = await api.checkoutSession(plan);
+      // If discount variant + weekly plan selected, send the promo SKU.
+      const planForApi = isDiscount && plan === "weekly" ? "weekly_promo" : plan;
+      const r = await api.checkoutSession(planForApi);
       if (Platform.OS === "web") {
         Linking.openURL(r.url);
       } else {
@@ -99,6 +115,7 @@ export default function Paywall() {
           try {
             const status = await api.checkoutStatus(r.session_id);
             if (status.payment_status === "paid") {
+              await resetEscalation();
               await refresh();
               router.replace("/(tabs)/home");
             }
@@ -176,10 +193,24 @@ export default function Paywall() {
             </View>
           </View>
 
-          <Text style={styles.title}>
-            {language === "fr"
-              ? "Débloque les icebreakers illimités"
-              : "Unlock unlimited icebreakers"}
+          {isDiscount && (
+            <View style={styles.promoBanner} testID="promo-banner">
+              <Text style={styles.promoBannerText}>
+                {language === "fr"
+                  ? "⏰ Offre 24h · -29% sur l'hebdo"
+                  : "⏰ 24h offer · 29% off Weekly"}
+              </Text>
+            </View>
+          )}
+
+          <Text style={[styles.title, isSheet && styles.titleSheet]}>
+            {isDiscount
+              ? language === "fr"
+                ? "Une dernière chance."
+                : "One more chance."
+              : language === "fr"
+                ? "Débloque les icebreakers illimités"
+                : "Unlock unlimited icebreakers"}
           </Text>
           <Text style={styles.subtitle}>
             {language === "fr"
@@ -203,6 +234,7 @@ export default function Paywall() {
             {(["yearly", "weekly", "lifetime"] as Plan[]).map((p) => {
               const meta = PLAN_META[p];
               const selected = plan === p;
+              const showDiscount = isDiscount && p === "weekly";
               return (
                 <TouchableOpacity
                   key={p}
@@ -211,10 +243,17 @@ export default function Paywall() {
                   testID={`plan-${p}`}
                   activeOpacity={0.85}
                 >
-                  {meta.badge && (
+                  {meta.badge && !showDiscount && (
                     <View style={styles.bestBadge}>
                       <Text style={styles.bestBadgeText}>
                         {language === "fr" ? "ÉCONOMISE 85%" : meta.badge.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  {showDiscount && (
+                    <View style={[styles.bestBadge, { backgroundColor: COLORS.accent }]}>
+                      <Text style={[styles.bestBadgeText, { color: COLORS.surface }]}>
+                        {language === "fr" ? "-29% · 24H" : "29% OFF · 24H"}
                       </Text>
                     </View>
                   )}
@@ -227,11 +266,24 @@ export default function Paywall() {
                           : language === "fr" ? "À VIE" : "LIFETIME"}
                     </Text>
                     <Text style={styles.planSub}>
-                      {language === "fr" ? meta.sub_fr : meta.sub_en}
+                      {showDiscount
+                        ? language === "fr"
+                          ? WEEKLY_PROMO_META.sub_fr
+                          : WEEKLY_PROMO_META.sub_en
+                        : language === "fr"
+                          ? meta.sub_fr
+                          : meta.sub_en}
                     </Text>
                   </View>
                   <View style={styles.planRight}>
-                    <Text style={styles.planPrice}>{meta.price}</Text>
+                    {showDiscount ? (
+                      <View style={styles.priceCol}>
+                        <Text style={styles.strikePrice}>{WEEKLY_PROMO_META.strike}</Text>
+                        <Text style={styles.planPrice}>{WEEKLY_PROMO_META.price}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.planPrice}>{meta.price}</Text>
+                    )}
                     <View style={[styles.radio, selected && styles.radioActive]}>
                       {selected && <Check size={12} color={COLORS.surface} strokeWidth={3} />}
                     </View>
@@ -323,6 +375,30 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     lineHeight: 32,
+  },
+  titleSheet: { fontSize: 24, lineHeight: 28 },
+  promoBanner: {
+    alignSelf: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,90,54,0.18)",
+    borderWidth: 1,
+    borderColor: COLORS.accent + "88",
+    marginTop: 8,
+  },
+  promoBannerText: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  priceCol: { alignItems: "flex-end" },
+  strikePrice: {
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    fontWeight: "700",
+    textDecorationLine: "line-through",
   },
   subtitle: {
     color: "rgba(255,255,255,0.72)",

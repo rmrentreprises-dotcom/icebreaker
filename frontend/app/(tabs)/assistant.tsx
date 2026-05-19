@@ -22,10 +22,12 @@ import { COLORS, STRINGS } from "../../src/theme";
 import { useAuth } from "../../src/auth";
 import { api } from "../../src/api";
 import { IcebreakerCard } from "../../src/IcebreakerCard";
+import { usePaywall } from "../../src/usePaywall";
 
 export default function AssistantScreen() {
   const router = useRouter();
   const { user, language, refresh } = useAuth();
+  const { open: openPaywall } = usePaywall();
   const insets = useSafeAreaInsets();
   const t = STRINGS[language];
   const [context, setContext] = useState("");
@@ -50,7 +52,8 @@ export default function AssistantScreen() {
       return;
     }
     if (!isPremium && callsRemaining <= 0) {
-      router.push("/paywall");
+      // Typing was the commitment device - now hit them with paywall, no API call wasted.
+      openPaywall({ source: "assistant" });
       return;
     }
     setBusy(true);
@@ -65,7 +68,7 @@ export default function AssistantScreen() {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e: any) {
       if (e.status === 402) {
-        router.push("/paywall");
+        openPaywall({ source: "assistant_402" });
         return;
       }
       // Friendly handling for AI service hiccups - the backend returns specific

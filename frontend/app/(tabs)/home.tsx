@@ -21,10 +21,12 @@ import { COLORS, STRINGS, CATEGORY_IMAGES } from "../../src/theme";
 import { useAuth } from "../../src/auth";
 import { api } from "../../src/api";
 import { IcebreakerCard } from "../../src/IcebreakerCard";
+import { usePaywall } from "../../src/usePaywall";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, language, refresh } = useAuth();
+  const { open: openPaywall, shouldShowOnLaunch } = usePaywall();
   const insets = useSafeAreaInsets();
   const [daily, setDaily] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -50,6 +52,17 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Re-engagement: if non-premium user has seen a paywall before and it's been >24h, re-fire.
+  useEffect(() => {
+    if (!user || user.is_premium) return;
+    (async () => {
+      const shouldShow = await shouldShowOnLaunch();
+      if (shouldShow) openPaywall({ source: "launch_24h" });
+    })();
+    // Only run once per Home mount per session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.is_premium]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -78,7 +91,7 @@ export default function HomeScreen() {
           {!user?.is_premium && (
             <TouchableOpacity
               style={styles.crownBtn}
-              onPress={() => router.push("/paywall")}
+              onPress={() => openPaywall({ source: "home_crown" })}
               testID="home-upgrade"
             >
               <Crown size={16} color={COLORS.accent} strokeWidth={2.4} />

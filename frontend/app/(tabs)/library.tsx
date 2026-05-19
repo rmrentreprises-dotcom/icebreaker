@@ -15,9 +15,14 @@ import { COLORS, STRINGS } from "../../src/theme";
 import { useAuth } from "../../src/auth";
 import { api } from "../../src/api";
 import { IcebreakerCard } from "../../src/IcebreakerCard";
+import { usePaywall } from "../../src/usePaywall";
+
+const SAMPLES_PER_CATEGORY = 3; // free unlocked previews per category
 
 export default function LibraryScreen() {
-  const { language } = useAuth();
+  const { user, language } = useAuth();
+  const { open: openPaywall } = usePaywall();
+  const isPremium = !!user?.is_premium;
   const insets = useSafeAreaInsets();
   const t = STRINGS[language];
   const [categories, setCategories] = useState<any[]>([]);
@@ -122,18 +127,30 @@ export default function LibraryScreen() {
         {loading ? (
           <ActivityIndicator color={COLORS.accent} style={{ marginTop: 32 }} />
         ) : (
-          items.map((it) => (
-            <IcebreakerCard
-              key={it.id}
-              text={it.text}
-              tone={it.tone}
-              category={it.category}
-              language={it.language}
-              source="library"
-              language_ui={language}
-              testID={`lib-${it.id}`}
-            />
-          ))
+          (() => {
+            // Per-category sample counter for "unlock first N per category" logic.
+            const seenPerCategory: Record<string, number> = {};
+            return items.map((it) => {
+              const cat = it.category || "_";
+              seenPerCategory[cat] = (seenPerCategory[cat] || 0) + 1;
+              const isSample = seenPerCategory[cat] <= SAMPLES_PER_CATEGORY;
+              const locked = !isPremium && !isSample;
+              return (
+                <IcebreakerCard
+                  key={it.id}
+                  text={it.text}
+                  tone={it.tone}
+                  category={it.category}
+                  language={it.language}
+                  source="library"
+                  language_ui={language}
+                  locked={locked}
+                  onLockedPress={() => openPaywall({ source: "library" })}
+                  testID={`lib-${it.id}`}
+                />
+              );
+            });
+          })()
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,5 +1,6 @@
 /**
- * Favorites tab - all saved icebreakers.
+ * Favorites tab — locked for non-premium users (paywall CTA).
+ * Premium users see their saved icebreakers as usual.
  */
 import React, { useEffect, useState, useCallback } from "react";
 import {
@@ -12,30 +13,38 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Trash2, Heart, Copy, Check } from "lucide-react-native";
+import { Trash2, Heart, Copy, Check, Lock } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { useFocusEffect } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, STRINGS } from "../../src/theme";
 import { useAuth } from "../../src/auth";
 import { api } from "../../src/api";
+import { usePaywall } from "../../src/usePaywall";
 
 export default function FavoritesScreen() {
-  const { language } = useAuth();
+  const { user, language } = useAuth();
+  const { open: openPaywall } = usePaywall();
   const insets = useSafeAreaInsets();
   const t = STRINGS[language];
+  const isPremium = !!user?.is_premium;
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!isPremium) {
+      setLoading(false);
+      return;
+    }
     try {
       const r = await api.favorites();
       setItems(r.items);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isPremium]);
 
   useEffect(() => {
     load();
@@ -64,6 +73,51 @@ export default function FavoritesScreen() {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
+  if (!isPremium) {
+    // Locked view - hero card with paywall CTA.
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.appLabel}>SAVED</Text>
+          <Text style={styles.title}>{t.favorites}</Text>
+        </View>
+        <View style={[styles.lockedWrap, { paddingBottom: insets.bottom + 100 }]} testID="favorites-locked">
+          <View style={styles.lockedCard}>
+            <LinearGradient
+              colors={["#0A0A0B", "#27272A"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.lockBadge}>
+              <Lock size={20} color="#FFD78A" />
+            </View>
+            <Text style={styles.lockedTitle}>
+              {language === "fr"
+                ? "Tes favoris t'attendent"
+                : "Your favorites await"}
+            </Text>
+            <Text style={styles.lockedSub}>
+              {language === "fr"
+                ? "Débloque Premium pour sauvegarder et organiser tes meilleures lignes."
+                : "Unlock Premium to save and organize your best lines."}
+            </Text>
+            <TouchableOpacity
+              style={styles.unlockBtn}
+              onPress={() => openPaywall({ source: "favorites" })}
+              testID="favorites-unlock"
+              activeOpacity={0.9}
+            >
+              <Text style={styles.unlockBtnText}>
+                {language === "fr" ? "Débloquer Premium" : "Unlock Premium"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
@@ -88,11 +142,17 @@ export default function FavoritesScreen() {
         ) : (
           items.map((it) => {
             const tone = it.tone;
-            const toneColor = tone && COLORS.tones[tone] ? COLORS.tones[tone] : COLORS.textTertiary;
+            const toneColor =
+              tone && COLORS.tones[tone] ? COLORS.tones[tone] : COLORS.textTertiary;
             return (
               <View key={it.id} style={styles.card} testID={`fav-${it.id}`}>
                 {tone && (
-                  <View style={[styles.toneTag, { backgroundColor: toneColor + "1A", borderColor: toneColor + "55" }]}>
+                  <View
+                    style={[
+                      styles.toneTag,
+                      { backgroundColor: toneColor + "1A", borderColor: toneColor + "55" },
+                    ]}
+                  >
                     <View style={[styles.dot, { backgroundColor: toneColor }]} />
                     <Text style={[styles.toneText, { color: toneColor }]}>
                       {(t.tones[tone] || tone).toUpperCase()}
@@ -126,7 +186,9 @@ export default function FavoritesScreen() {
                     testID={`fav-${it.id}-remove`}
                   >
                     <Trash2 size={16} color={COLORS.accent} />
-                    <Text style={[styles.actionText, { color: COLORS.accent, fontWeight: "700" }]}>
+                    <Text
+                      style={[styles.actionText, { color: COLORS.accent, fontWeight: "700" }]}
+                    >
                       {language === "fr" ? "Retirer" : "Remove"}
                     </Text>
                   </TouchableOpacity>
@@ -150,7 +212,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 4,
   },
-  title: { fontSize: 32, fontWeight: "900", color: COLORS.textPrimary, letterSpacing: -1.2 },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: COLORS.textPrimary,
+    letterSpacing: -1.2,
+  },
   list: { paddingHorizontal: 20, paddingTop: 8, gap: 12 },
   empty: { alignItems: "center", padding: 60, gap: 12 },
   emptyText: { color: COLORS.textSecondary, fontSize: 14, textAlign: "center" },
@@ -190,4 +257,44 @@ const styles = StyleSheet.create({
   },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
   actionText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
+  /* Locked variant */
+  lockedWrap: { flex: 1, paddingHorizontal: 20, justifyContent: "center" },
+  lockedCard: {
+    overflow: "hidden",
+    borderRadius: 22,
+    padding: 28,
+    gap: 10,
+  },
+  lockBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,215,138,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,215,138,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  lockedTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    color: COLORS.surface,
+    letterSpacing: -0.9,
+    lineHeight: 30,
+  },
+  lockedSub: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.7)",
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  unlockBtn: {
+    backgroundColor: COLORS.accent,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 14,
+  },
+  unlockBtnText: { color: COLORS.surface, fontWeight: "900", fontSize: 15, letterSpacing: -0.3 },
 });

@@ -1,0 +1,47 @@
+{
+  "summary": "Lock-everything-except-the-tease monetization update — backend regression + new weekly_promo plan validated. 30/30 pytest tests pass (100%) against the public preview URL. New tests added: (1) POST /api/checkout/session {plan:'weekly_promo'} for a registered user returns 200 or 502 with placeholder STRIPE_API_KEY (accepted — code-level config is correct: PRICES['weekly_promo'] = {amount:499, mode:'subscription', interval:'week', trial_days:3}); (2) guest user blocked from weekly_promo with 400 'create an account'. All previous behavior unchanged: weekly $6.99, yearly $39.99, lifetime $59.99 (mode=payment), monthly returns 400, invalid plan returns 400, guest blocked from checkout, register→quiz→generate (200)→generate (402 'Free preview used') E2E flow intact, library/categories/daily endpoints OK, no _id leaks.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/checkout/session (weekly|weekly_promo|yearly|lifetime)",
+        "issue": "Returns 502 'Invalid API Key provided: sk_test_****gent' — expected per review_request (placeholder key). To fully verify recurring.interval='week' and subscription_data.trial_period_days=3 reach Stripe for weekly_promo, replace STRIPE_API_KEY with a real Stripe test secret key. Code inspection of /app/backend/server.py PRICES + checkout_session() confirms payload is built identically to 'weekly' with amount=499 instead of 699."
+      },
+      {
+        "endpoint": "PRICES dict",
+        "issue": "weekly_promo has no end-date or auto-expiry logic in backend; it's a perpetual SKU. If product wants the promo to be limited-window or one-time-per-user, that needs to be enforced (currently any user can call POST /api/checkout/session {plan:'weekly_promo'} unlimited times)."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_icebreaker_api.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Replace STRIPE_API_KEY placeholder 'sk_test_emergent' in /app/backend/.env with a real Stripe test secret key to E2E-validate that weekly_promo correctly creates a $4.99/week subscription with trial_period_days=3 on Stripe.",
+    "Decide whether weekly_promo should be gated (e.g., only offered once per user, or only inside the discount-paywall variant) — currently no server-side enforcement exists; any authenticated non-guest user can call it directly."
+  ],
+  "critical_code_review_comments": [
+    "weekly_promo entry in PRICES is a clean copy of weekly with amount=499 and the same interval/trial_days — reuses existing checkout_session() branching without code duplication. Good.",
+    "Frontend lock pattern (first-3 lines per category + locked favorites + paywall-on-Generate-when-quota-zero) is purely client-side as noted; backend has no new endpoints/state to validate beyond the existing 402 path on /api/icebreakers/generate, which still works correctly.",
+    "server.py is now ~720 lines — still exceeds the 700-line guideline. Consider splitting into routers/{auth,icebreakers,checkout}.py.",
+    "checkout_session still maps all Stripe errors (including auth failures with the placeholder key) to 502. Consider 500 for config-level errors so monitoring can distinguish ours-vs-Stripe.",
+    "PRICES has no programmatic guard against amount==0 or trial_days<0 — minor, currently all values are hard-coded constants."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_icebreaker_api.py (added 2 tests for weekly_promo: test_weekly_promo_plan_creates_session_or_502, test_weekly_promo_guest_blocked; updated TestPricingConfigShape to assert '\"weekly_promo\"' and '499' present in PRICES; renamed test_prices_dict_has_only_3_plans -> test_prices_dict_has_expected_plans)"
+  ],
+  "success_rate": {"backend": "100% (30/30)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Tests create ephemeral users with email pattern test_<uuid>@example.com and guest sessions. No persistent seed data created. Library seeds auto-loaded on backend startup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app && pytest backend/tests/test_icebreaker_api.py -v --tb=short. ~35s end-to-end (one real Claude call). All 4 Stripe checkout tests (weekly, weekly_promo, yearly, lifetime) accept 200 OR 502 because STRIPE_API_KEY in /app/backend/.env is placeholder 'sk_test_emergent'. PRICES currently has 4 plans: weekly($6.99), weekly_promo($4.99), yearly($39.99), lifetime($59.99). Frontend monetization lock changes (first-3-lines, locked favorites, no-API paywall-on-Generate) are purely client-side and were intentionally not in scope.",
+  "rca_of_issue": "Not applicable — no regressions found. weekly_promo plan was added to PRICES correctly and behaves identically to weekly with a $2 lower amount; the checkout_session() handler picks it up via the same code path."
+}

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { Heart, Copy, Check } from "lucide-react-native";
+import { Heart, Copy, Check, Lock } from "lucide-react-native";
 import { COLORS, STRINGS, Lang } from "./theme";
 import { api } from "./api";
 
@@ -24,6 +24,9 @@ interface Props {
   language_ui?: Lang;
   onSaved?: (id: string) => void;
   testID?: string;
+  /** When true: blur the line and show lock — tap fires onLockedPress (paywall). */
+  locked?: boolean;
+  onLockedPress?: () => void;
 }
 
 export function IcebreakerCard({
@@ -35,6 +38,8 @@ export function IcebreakerCard({
   language_ui = "en",
   onSaved,
   testID,
+  locked = false,
+  onLockedPress,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -69,6 +74,52 @@ export function IcebreakerCard({
   };
 
   const toneColor = tone && COLORS.tones[tone] ? COLORS.tones[tone] : COLORS.textTertiary;
+
+  if (locked) {
+    // Locked variant - blurred preview + tap-to-unlock paywall trigger.
+    const preview = text.length > 28 ? text.slice(0, 28) + "…" : text;
+    return (
+      <TouchableOpacity
+        style={[styles.card, styles.lockedCard]}
+        onPress={onLockedPress}
+        activeOpacity={0.85}
+        testID={testID}
+      >
+        <View style={styles.toneRow}>
+          {tone ? (
+            <View
+              style={[
+                styles.toneTag,
+                { backgroundColor: toneColor + "1A", borderColor: toneColor + "55" },
+              ]}
+            >
+              <View style={[styles.dot, { backgroundColor: toneColor }]} />
+              <Text style={[styles.toneText, { color: toneColor }]}>
+                {(t.tones[tone] || tone).toUpperCase()}
+              </Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <View style={styles.lockBadge}>
+            <Lock size={11} color={COLORS.textSecondary} />
+            <Text style={styles.lockBadgeText}>
+              {language_ui === "fr" ? "Premium" : "Premium"}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.lineText, styles.lineLocked]} numberOfLines={2}>
+          {preview}
+        </Text>
+        <View style={styles.unlockBar}>
+          <Lock size={13} color={COLORS.accent} />
+          <Text style={styles.unlockText}>
+            {language_ui === "fr" ? "Toucher pour débloquer" : "Tap to unlock"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View style={styles.card} testID={testID}>
@@ -144,4 +195,39 @@ const styles = StyleSheet.create({
   },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4 },
   actionText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
+  lockedCard: {
+    backgroundColor: COLORS.surfaceAlt,
+    borderColor: COLORS.border,
+  },
+  lineLocked: {
+    color: COLORS.textTertiary,
+    opacity: 0.55,
+    fontStyle: "italic",
+  },
+  lockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  lockBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: COLORS.textSecondary,
+    letterSpacing: 1.2,
+  },
+  unlockBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  unlockText: { color: COLORS.accent, fontSize: 13, fontWeight: "800", letterSpacing: -0.2 },
 });

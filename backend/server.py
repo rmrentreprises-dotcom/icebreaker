@@ -608,6 +608,13 @@ PRICES = {
         "interval": "week",
         "trial_days": 3,
     },
+    "weekly_promo": {
+        "amount": 499,
+        "name": "Premium Weekly (Special offer)",
+        "mode": "subscription",
+        "interval": "week",
+        "trial_days": 3,
+    },
     "yearly": {
         "amount": 3999,
         "name": "Premium Yearly",

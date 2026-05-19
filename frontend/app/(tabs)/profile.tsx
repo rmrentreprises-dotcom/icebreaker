@@ -24,10 +24,12 @@ import {
 } from "lucide-react-native";
 import { COLORS, STRINGS, Lang } from "../../src/theme";
 import { useAuth } from "../../src/auth";
+import { usePaywall } from "../../src/usePaywall";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, language, setLanguage, signOut } = useAuth();
+  const { open: openPaywall } = usePaywall();
   const insets = useSafeAreaInsets();
   const t = STRINGS[language];
 
@@ -105,7 +107,7 @@ export default function ProfileScreen() {
         ) : (
           <TouchableOpacity
             style={styles.upgradeCard}
-            onPress={() => router.push("/paywall")}
+            onPress={() => openPaywall({ source: "profile" })}
             activeOpacity={0.9}
             testID="profile-upgrade"
           >

@@ -419,12 +419,30 @@ class TestCheckoutPlans:
         )
         assert r.status_code in (200, 502), f"Unexpected {r.status_code}: {r.text}"
 
+    def test_weekly_promo_plan_creates_session_or_502(self, reg_h):
+        """NEW (Jan 2026): weekly_promo = $4.99/week, 3-day trial — for discount paywall variant."""
+        r = requests.post(
+            f"{API}/checkout/session", headers=reg_h, json={"plan": "weekly_promo"}, timeout=30
+        )
+        assert r.status_code in (200, 502), f"Unexpected {r.status_code}: {r.text}"
+        if r.status_code == 200:
+            data = r.json()
+            assert data.get("session_id")
+            assert data.get("url", "").startswith("https://")
+
+    def test_weekly_promo_guest_blocked(self, guest_h):
+        r = requests.post(
+            f"{API}/checkout/session", headers=guest_h, json={"plan": "weekly_promo"}, timeout=15
+        )
+        assert r.status_code == 400, r.text
+        assert "account" in r.json().get("detail", "").lower()
+
 
 # --------------------------- Verify pricing config in code ---------------------------
 class TestPricingConfigShape:
     """Static checks on server's PRICES dict via import (defensive)."""
 
-    def test_prices_dict_has_only_3_plans(self):
+    def test_prices_dict_has_expected_plans(self):
         # Import the server module to verify PRICES shape directly.
         import importlib.util, sys, pathlib
         spec = importlib.util.spec_from_file_location(
@@ -434,11 +452,14 @@ class TestPricingConfigShape:
         # Simplest: read the file and check.
         text = pathlib.Path("/app/backend/server.py").read_text()
         assert '"weekly"' in text
+        assert '"weekly_promo"' in text  # NEW Jan 2026 discount paywall variant
         assert '"yearly"' in text
         assert '"lifetime"' in text
         assert "trial_period_days" in text or "trial_days" in text
         # weekly cents = 699
         assert "699" in text
+        # weekly_promo cents = 499
+        assert "499" in text
         # yearly cents = 3999
         assert "3999" in text
         # lifetime cents = 5999
