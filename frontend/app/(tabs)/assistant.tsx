@@ -66,9 +66,32 @@ export default function AssistantScreen() {
     } catch (e: any) {
       if (e.status === 402) {
         router.push("/paywall");
-      } else {
-        Alert.alert("Error", e.message || "Failed to generate");
+        return;
       }
+      // Friendly handling for AI service hiccups - the backend returns specific
+      // 429 (rate), 503 (overload/auth), 504 (timeout). Show retry-friendly UI.
+      const friendly = {
+        429: language === "fr"
+          ? "Le service IA est très demandé. Réessaie dans un instant."
+          : "AI is in high demand. Try again in a moment.",
+        503: language === "fr"
+          ? "Le service IA est temporairement saturé. Réessaie dans quelques secondes."
+          : "AI is temporarily overloaded. Try again in a few seconds.",
+        504: language === "fr"
+          ? "La génération a pris trop de temps. Réessaie."
+          : "The request took too long. Please try again.",
+      } as Record<number, string>;
+      const msg = friendly[e.status] || e.message || (
+        language === "fr"
+          ? "Service IA indisponible pour l'instant. Réessaie."
+          : "AI service is unavailable right now. Please try again."
+      );
+      setResults({
+        icebreakers: [],
+        tip: "",
+        // @ts-ignore custom field
+        error: msg,
+      } as any);
     } finally {
       setBusy(false);
     }
@@ -152,26 +175,49 @@ export default function AssistantScreen() {
               )}
               {results && !busy && (
                 <View style={{ gap: 12 }}>
-                  {results.icebreakers.map((ib, i) => (
-                    <IcebreakerCard
-                      key={i}
-                      text={ib.line}
-                      tone={ib.tone}
-                      language={language}
-                      source="ai"
-                      language_ui={language}
-                      testID={`ai-result-${i}`}
-                    />
-                  ))}
-                  {results.tip ? (
-                    <View style={styles.tipCard}>
+                  {(results as any).error ? (
+                    <View style={styles.errorCard} testID="ai-error-card">
                       <Lightbulb size={18} color={COLORS.accent} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.tipLabel}>{t.tip.toUpperCase()}</Text>
-                        <Text style={styles.tipText}>{results.tip}</Text>
+                      <View style={{ flex: 1, gap: 8 }}>
+                        <Text style={styles.errorTitle}>
+                          {language === "fr" ? "Oups, réessaie" : "Hiccup — try again"}
+                        </Text>
+                        <Text style={styles.errorText}>{(results as any).error}</Text>
+                        <TouchableOpacity
+                          onPress={onGenerate}
+                          style={styles.retryBtn}
+                          testID="ai-retry-btn"
+                        >
+                          <Text style={styles.retryBtnText}>
+                            {language === "fr" ? "Réessayer" : "Try again"}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  ) : null}
+                  ) : (
+                    <>
+                      {results.icebreakers.map((ib, i) => (
+                        <IcebreakerCard
+                          key={i}
+                          text={ib.line}
+                          tone={ib.tone}
+                          language={language}
+                          source="ai"
+                          language_ui={language}
+                          testID={`ai-result-${i}`}
+                        />
+                      ))}
+                      {results.tip ? (
+                        <View style={styles.tipCard}>
+                          <Lightbulb size={18} color={COLORS.accent} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.tipLabel}>{t.tip.toUpperCase()}</Text>
+                            <Text style={styles.tipText}>{results.tip}</Text>
+                          </View>
+                        </View>
+                      ) : null}
+                    </>
+                  )}
                 </View>
               )}
             </View>
@@ -285,6 +331,26 @@ const styles = StyleSheet.create({
   },
   tipLabel: { fontSize: 10, fontWeight: "800", letterSpacing: 1.5, color: "#A87800", marginBottom: 4 },
   tipText: { fontSize: 14, color: COLORS.textPrimary, lineHeight: 20 },
+  errorCard: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+    backgroundColor: COLORS.accentSoft,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.accent + "55",
+  },
+  errorTitle: { fontSize: 15, fontWeight: "800", color: COLORS.textPrimary, letterSpacing: -0.3 },
+  errorText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19 },
+  retryBtn: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: COLORS.accent,
+    marginTop: 2,
+  },
+  retryBtnText: { color: COLORS.surface, fontWeight: "800", fontSize: 13 },
   composer: {
     position: "absolute",
     left: 0,

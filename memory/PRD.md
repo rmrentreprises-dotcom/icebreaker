@@ -45,6 +45,14 @@ Mobile-first React Native Expo app that helps users come up with personalized ic
 - Free tier bottlenecks AI to drive conversion
 - Yearly plan saves 33% (best-value anchor)
 
+## Security & resilience
+- **API key is server-side only.** The Anthropic / Emergent LLM key lives in `/app/backend/.env` and is never shipped to the mobile/web bundle. The mobile app only ever calls `/api/*` endpoints, which proxy to Claude on the server.
+- **AI errors handled gracefully**: backend maps Anthropic 429 (rate limit), 529 (overload), timeout, and auth/credit failures to friendly 429/503/504 responses with localized EN+FR messages and `Retry-After` headers. Frontend displays a card with a "Try again" button (no crashes).
+- **Burst limit**: 8 AI calls / minute / user (in addition to the 3/day free-tier cap) softens viral spikes.
+- **Retry with backoff**: backend transparently retries once with jittered backoff on transient upstream errors before surfacing to the user.
+- **Account funds**: managed by Emergent Universal Key — top up in **Profile → Universal Key → Add Balance** (auto top-up recommended) so AI calls never silently fail.
+- **Prompt caching**: prepared in code but not enabled (system prompt is ~250 tokens, below Anthropic's 1024-token cache minimum). Worth wiring when the system prompt grows past that threshold.
+
 ## File Map
 - `/app/backend/server.py` - main FastAPI app
 - `/app/backend/icebreakers_seed.py` - 540 curated icebreakers

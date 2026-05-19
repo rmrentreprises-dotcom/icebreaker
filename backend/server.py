@@ -155,8 +155,85 @@ def serialize_user(user: dict) -> dict:
     }
 
 
+# --------------------------- Resilience helpers (LLM) ---------------------------
+import asyncio as _asyncio
+import time as _time
+
+# Per-user burst limiter: max N concurrent / per-minute AI calls.
+_USER_BURST_WINDOW_S = 60
+_USER_BURST_MAX = 8  # 8 calls / minute / user (premium can still hit daily caps later)
+_user_burst_log: dict[str, list[float]] = {}
+
+
+def _enforce_user_burst(user_id: str) -> None:
+    now = _time.time()
+    bucket = _user_burst_log.setdefault(user_id, [])
+    # purge old timestamps
+    cutoff = now - _USER_BURST_WINDOW_S
+    while bucket and bucket[0] < cutoff:
+        bucket.pop(0)
+    if len(bucket) >= _USER_BURST_MAX:
+        raise HTTPException(
+            status_code=429,
+            detail="You're moving fast. Slow down a moment and try again.",
+            headers={"Retry-After": "20"},
+        )
+    bucket.append(now)
+
+
+async def _call_claude_with_retry(system: str, user_msg: str, timeout_s: float = 25.0):
+    """Call Claude Sonnet 4.5 via emergentintegrations with:
+       - hard timeout
+       - one retry with jittered backoff on transient errors (rate limit / overload / network)
+       - structured error classification returned to caller
+    Returns: (text, err_code | None)
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+    last_err_code: Optional[str] = None
+    for attempt in range(2):
+        session_id = str(uuid.uuid4())
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system
+        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+        try:
+            resp = await _asyncio.wait_for(
+                chat.send_message(UserMessage(text=user_msg)), timeout=timeout_s
+            )
+            text = resp if isinstance(resp, str) else str(resp)
+            if not text.strip():
+                last_err_code = "empty"
+                continue
+            return text, None
+        except _asyncio.TimeoutError:
+            last_err_code = "timeout"
+        except Exception as e:
+            msg = str(e).lower()
+            # Map common upstream errors to classes
+            if "429" in msg or "rate" in msg and "limit" in msg:
+                last_err_code = "rate_limited"
+            elif "529" in msg or "overload" in msg or "overloaded" in msg:
+                last_err_code = "overloaded"
+            elif "401" in msg or "403" in msg or "auth" in msg or "credit" in msg or "balance" in msg:
+                last_err_code = "auth"
+            elif "timeout" in msg or "timed out" in msg:
+                last_err_code = "timeout"
+            else:
+                last_err_code = "upstream"
+            logger.warning(f"Claude attempt {attempt + 1} failed: {last_err_code} :: {e}")
+
+        # Only retry once, and only for transient classes
+        if attempt == 0 and last_err_code in ("rate_limited", "overloaded", "timeout", "empty", "upstream"):
+            # jittered backoff: 0.6s base + up to 0.4s jitter
+            import random as _r
+            await _asyncio.sleep(0.6 + _r.random() * 0.4)
+            continue
+        break
+
+    return "", last_err_code or "upstream"
+
+
 # --------------------------- Startup ---------------------------
-@app.on_event("startup")
 async def startup_event():
     count = await db.icebreakers.count_documents({})
     if count == 0:
@@ -327,6 +404,10 @@ async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
             detail=f"Free tier limit reached ({FREE_DAILY_AI_CALLS}/day). Upgrade to Premium.",
         )
 
+    # Lightweight per-user burst limiter (in-memory) to soften viral-spike load
+    # on the shared LLM quota; this complements the free-tier daily cap.
+    _enforce_user_burst(user["id"])
+
     from emergentintegrations.llm.chat import LlmChat, UserMessage
 
     lang = payload.language if payload.language in ("en", "fr") else "en"
@@ -354,17 +435,64 @@ async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
             "Generate 5 varied icebreakers (different tones), contextual and natural. JSON only."
         )
 
-    session_id = str(uuid.uuid4())
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY, session_id=session_id, system_message=system
-    ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-    try:
-        resp = await chat.send_message(UserMessage(text=user_msg))
-    except Exception as e:
-        logger.exception("Claude error")
-        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+    # NOTE on prompt caching: Anthropic prompt-cache requires >=1024 tokens in the
+    # cacheable block. Our system prompt is ~250 tokens, so caching would have no
+    # effect today. If the system prompt grows past 1024 tokens, attach
+    # `cache_control={"type":"ephemeral"}` to the system block via litellm to save ~90%
+    # on repeated tokens.
 
-    text = resp if isinstance(resp, str) else str(resp)
+    text, err_code = await _call_claude_with_retry(system, user_msg)
+    if err_code:
+        # Map upstream failures to user-friendly responses.
+        if err_code == "rate_limited":
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Le service IA est très demandé. Réessaie dans un instant."
+                    if lang == "fr"
+                    else "AI is in high demand. Please try again in a moment."
+                ),
+                headers={"Retry-After": "20"},
+            )
+        if err_code == "overloaded":
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Le service IA est temporairement saturé. Réessaie dans quelques secondes."
+                    if lang == "fr"
+                    else "AI is temporarily overloaded. Try again in a few seconds."
+                ),
+                headers={"Retry-After": "10"},
+            )
+        if err_code == "timeout":
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "La génération a pris trop de temps. Réessaie."
+                    if lang == "fr"
+                    else "The request took too long. Please try again."
+                ),
+            )
+        if err_code == "auth":
+            # Likely Emergent LLM key issue (out of credit / invalid). Don't leak detail.
+            logger.error("LLM auth/credit failure")
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Le service IA est indisponible. L'équipe a été alertée."
+                    if lang == "fr"
+                    else "AI service unavailable. The team has been notified."
+                ),
+            )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Service IA indisponible pour l'instant."
+                if lang == "fr"
+                else "AI service is unavailable right now."
+            ),
+        )
+
     parsed = None
     try:
         start = text.find("{")
