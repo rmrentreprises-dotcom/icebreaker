@@ -13,8 +13,10 @@ interface User {
   is_guest: boolean;
   is_premium: boolean;
   trial_ends_at: string | null;
-  daily_ai_calls_used: number;
-  daily_ai_calls_remaining: number;
+  lifetime_ai_calls_used: number;
+  lifetime_ai_calls_remaining: number;
+  onboarding_complete?: boolean;
+  quiz_answers?: any;
 }
 
 interface AuthContextValue {

@@ -36,7 +36,7 @@ export default function AssistantScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const callsRemaining = user?.daily_ai_calls_remaining ?? 0;
+  const callsRemaining = user?.lifetime_ai_calls_remaining ?? 0;
   const isPremium = !!user?.is_premium;
 
   useEffect(() => {

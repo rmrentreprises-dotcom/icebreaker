@@ -13,6 +13,9 @@ export default function RootLayout() {
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#F8F9FA" } }}>
             <Stack.Screen name="index" />
+            <Stack.Screen name="onboarding/quiz" options={{ animation: "slide_from_right" }} />
+            <Stack.Screen name="onboarding/taste" options={{ animation: "slide_from_right" }} />
+            <Stack.Screen name="auth/signin" options={{ animation: "slide_from_right" }} />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="paywall" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
             <Stack.Screen name="category/[id]" options={{ animation: "slide_from_right" }} />

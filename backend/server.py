@@ -42,8 +42,8 @@ db = client[DB_NAME]
 app = FastAPI(title="Icebreaker AI")
 api = APIRouter(prefix="/api")
 
-FREE_DAILY_AI_CALLS = 3
-TRIAL_DAYS = 7
+FREE_LIFETIME_AI_CALLS = 1  # Hard paywall: 1 free taste, then subscribe.
+TRIAL_DAYS = 0  # Trial is now bundled into the Stripe weekly subscription (3-day free trial).
 
 
 def now_utc():
@@ -65,6 +65,13 @@ class LoginIn(BaseModel):
 
 class GuestIn(BaseModel):
     language: str = "en"
+
+
+class QuizIn(BaseModel):
+    age_range: Optional[str] = None  # "18-24" | "25-34" | "35-44" | "45+"
+    dating_goal: Optional[str] = None  # "serious" | "casual" | "practice" | "vacation"
+    style: Optional[str] = None  # tone preference
+    meet_location: Optional[str] = None  # category id
 
 
 class GenerateIn(BaseModel):
@@ -136,9 +143,7 @@ def is_premium(user: dict) -> bool:
 
 
 def serialize_user(user: dict) -> dict:
-    today_key = now_utc().strftime("%Y-%m-%d")
-    daily = user.get("ai_calls_by_day", {}).get(today_key, 0)
-    trial_ends = user.get("trial_ends_at")
+    used = int(user.get("lifetime_ai_calls_used", 0))
     premium = is_premium(user)
     return {
         "id": user["id"],
@@ -147,11 +152,13 @@ def serialize_user(user: dict) -> dict:
         "language": user.get("language", "en"),
         "is_guest": bool(user.get("is_guest")),
         "is_premium": premium,
-        "trial_ends_at": trial_ends.isoformat() if trial_ends else None,
-        "daily_ai_calls_used": daily,
-        "daily_ai_calls_remaining": (
-            9999 if premium else max(0, FREE_DAILY_AI_CALLS - daily)
+        "trial_ends_at": None,
+        "lifetime_ai_calls_used": used,
+        "lifetime_ai_calls_remaining": (
+            9999 if premium else max(0, FREE_LIFETIME_AI_CALLS - used)
         ),
+        "onboarding_complete": bool(user.get("onboarding_complete")),
+        "quiz_answers": user.get("quiz_answers"),
     }
 
 
@@ -281,8 +288,8 @@ async def register(payload: RegisterIn):
         "language": payload.language if payload.language in ("en", "fr") else "en",
         "is_guest": False,
         "is_premium": False,
-        "trial_ends_at": now_utc() + timedelta(days=TRIAL_DAYS),
-        "ai_calls_by_day": {},
+        "trial_ends_at": None,
+        "lifetime_ai_calls_used": 0,
         "created_at": now_utc(),
     }
     await db.users.insert_one(user_doc)
@@ -317,7 +324,7 @@ async def guest(payload: GuestIn):
         "is_guest": True,
         "is_premium": False,
         "trial_ends_at": None,
-        "ai_calls_by_day": {},
+        "lifetime_ai_calls_used": 0,
         "created_at": now_utc(),
     }
     await db.users.insert_one(user_doc)
@@ -396,12 +403,13 @@ async def daily(language: str = "en", user: dict = Depends(get_current_user)):
 
 @api.post("/icebreakers/generate")
 async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
-    today_key = now_utc().strftime("%Y-%m-%d")
-    used = user.get("ai_calls_by_day", {}).get(today_key, 0)
-    if not is_premium(user) and used >= FREE_DAILY_AI_CALLS:
+    used = int(user.get("lifetime_ai_calls_used", 0))
+    if not is_premium(user) and used >= FREE_LIFETIME_AI_CALLS:
         raise HTTPException(
             status_code=402,
-            detail=f"Free tier limit reached ({FREE_DAILY_AI_CALLS}/day). Upgrade to Premium.",
+            detail=(
+                "Free preview used. Subscribe to unlock unlimited AI icebreakers."
+            ),
         )
 
     # Lightweight per-user burst limiter (in-memory) to soften viral-spike load
@@ -513,7 +521,7 @@ async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
 
     await db.users.update_one(
         {"id": user["id"]},
-        {"$inc": {f"ai_calls_by_day.{today_key}": 1}},
+        {"$inc": {"lifetime_ai_calls_used": 1}},
     )
     history_id = str(uuid.uuid4())
     history_doc = {
@@ -532,7 +540,7 @@ async def generate(payload: GenerateIn, user: dict = Depends(get_current_user)):
         "icebreakers": icebreakers,
         "tip": tip,
         "calls_remaining": (
-            9999 if is_premium(user) else max(0, FREE_DAILY_AI_CALLS - used - 1)
+            9999 if is_premium(user) else max(0, FREE_LIFETIME_AI_CALLS - used - 1)
         ),
     }
 
@@ -580,10 +588,37 @@ async def list_favorites(user: dict = Depends(get_current_user)):
     return {"items": items}
 
 
+@api.post("/auth/quiz")
+async def save_quiz(payload: QuizIn, user: dict = Depends(get_current_user)):
+    answers = {k: v for k, v in payload.model_dump().items() if v is not None}
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"quiz_answers": answers, "onboarding_complete": True}},
+    )
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    return {"user": serialize_user(fresh)}
+
+
 # --------------------------- Stripe Checkout ---------------------------
 PRICES = {
-    "monthly": {"amount": 999, "name": "Premium Monthly"},
-    "yearly": {"amount": 7999, "name": "Premium Yearly"},
+    "weekly": {
+        "amount": 699,
+        "name": "Premium Weekly",
+        "mode": "subscription",
+        "interval": "week",
+        "trial_days": 3,
+    },
+    "yearly": {
+        "amount": 3999,
+        "name": "Premium Yearly",
+        "mode": "subscription",
+        "interval": "year",
+    },
+    "lifetime": {
+        "amount": 5999,
+        "name": "Premium Lifetime",
+        "mode": "payment",
+    },
 }
 
 
@@ -592,32 +627,38 @@ async def checkout_session(payload: CheckoutIn, user: dict = Depends(get_current
     if payload.plan not in PRICES:
         raise HTTPException(status_code=400, detail="Invalid plan")
     if user.get("is_guest"):
-        raise HTTPException(status_code=400, detail="Please create an account before subscribing")
+        raise HTTPException(
+            status_code=400, detail="Please create an account before subscribing"
+        )
     price = PRICES[payload.plan]
     success_url = f"{PUBLIC_BASE_URL}/?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{PUBLIC_BASE_URL}/?checkout=cancel"
     try:
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            payment_method_types=["card"],
-            customer_email=user.get("email"),
-            metadata={"user_id": user["id"], "plan": payload.plan},
-            line_items=[
-                {
-                    "price_data": {
-                        "currency": "usd",
-                        "product_data": {
-                            "name": f"Icebreaker AI - {price['name']}",
-                            "description": "Unlimited AI icebreakers + live assistant",
-                        },
-                        "unit_amount": price["amount"],
-                    },
-                    "quantity": 1,
-                }
-            ],
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
+        line_item = {
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": f"Icebreaker AI - {price['name']}",
+                    "description": "Unlimited AI icebreakers + full library",
+                },
+                "unit_amount": price["amount"],
+            },
+            "quantity": 1,
+        }
+        kwargs: dict = {
+            "mode": price["mode"],
+            "payment_method_types": ["card"],
+            "customer_email": user.get("email"),
+            "metadata": {"user_id": user["id"], "plan": payload.plan},
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+        }
+        if price["mode"] == "subscription":
+            line_item["price_data"]["recurring"] = {"interval": price["interval"]}
+            if price.get("trial_days"):
+                kwargs["subscription_data"] = {"trial_period_days": price["trial_days"]}
+        kwargs["line_items"] = [line_item]
+        session = stripe.checkout.Session.create(**kwargs)
         await db.payments.insert_one(
             {
                 "id": str(uuid.uuid4()),

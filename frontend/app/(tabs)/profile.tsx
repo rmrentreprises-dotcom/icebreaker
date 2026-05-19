@@ -174,14 +174,14 @@ export default function ProfileScreen() {
         <Text style={styles.sectionLabel}>{language === "fr" ? "AUJOURD'HUI" : "TODAY"}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{user?.daily_ai_calls_used || 0}</Text>
+            <Text style={styles.statValue}>{user?.lifetime_ai_calls_used || 0}</Text>
             <Text style={styles.statLabel}>
               {language === "fr" ? "appels IA" : "AI calls"}
             </Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>
-              {user?.is_premium ? "∞" : (user?.daily_ai_calls_remaining ?? 0)}
+              {user?.is_premium ? "∞" : (user?.lifetime_ai_calls_remaining ?? 0)}
             </Text>
             <Text style={styles.statLabel}>
               {language === "fr" ? "restants" : "remaining"}

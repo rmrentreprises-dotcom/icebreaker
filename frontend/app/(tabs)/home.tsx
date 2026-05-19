@@ -58,7 +58,7 @@ export default function HomeScreen() {
   };
 
   const greeting = user?.full_name ? `Hi, ${user.full_name.split(" ")[0]}` : t.tagline;
-  const callsRemaining = user?.daily_ai_calls_remaining ?? 0;
+  const callsRemaining = user?.lifetime_ai_calls_remaining ?? 0;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -94,7 +94,7 @@ export default function HomeScreen() {
               {user?.is_premium
                 ? t.premium
                 : callsRemaining > 0
-                  ? t.callsLeft(callsRemaining)
+                  ? (language === "fr" ? "1 essai gratuit dispo" : "1 free preview left")
                   : t.upgrade}
             </Text>
           </View>

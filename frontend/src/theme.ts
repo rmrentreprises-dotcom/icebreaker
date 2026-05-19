@@ -67,11 +67,12 @@ export const API_URL = `${process.env.EXPO_PUBLIC_BACKEND_URL || ""}/api`;
 export const STRINGS = {
   en: {
     appName: "Icebreaker AI",
-    tagline: "Spark conversations. Anywhere.",
-    onboardWelcome: "Break the ice — confidently.",
+    tagline: "Never run out of things to say.",
+    onboardWelcome: "Never run out of\nthings to say.",
     onboardSubtitle:
-      "10,000+ curated openers + a live AI assistant that crafts perfect lines for any moment.",
-    continueGuest: "Continue as guest",
+      "10,000+ ready-to-use openers + unlimited AI-powered icebreakers for any moment.",
+    continueGuest: "Skip — just browse",
+    getStarted: "Get started",
     signIn: "Sign in",
     signUp: "Create account",
     email: "Email",
@@ -131,11 +132,12 @@ export const STRINGS = {
   },
   fr: {
     appName: "Icebreaker AI",
-    tagline: "Lancez la conversation. Partout.",
-    onboardWelcome: "Brisez la glace — avec style.",
+    tagline: "Ne jamais être à court de mots.",
+    onboardWelcome: "Ne jamais être\nà court de mots.",
     onboardSubtitle:
-      "Plus de 10 000 phrases d'accroche + un assistant IA qui crée la ligne parfaite, à la demande.",
-    continueGuest: "Continuer en invité",
+      "Plus de 10 000 phrases prêtes à l'emploi + icebreakers IA illimités pour chaque moment.",
+    continueGuest: "Passer — juste parcourir",
+    getStarted: "Commencer",
     signIn: "Se connecter",
     signUp: "Créer un compte",
     email: "Email",

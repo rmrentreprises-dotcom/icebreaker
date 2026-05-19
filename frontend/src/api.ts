@@ -69,6 +69,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ language }),
     }),
+  saveQuiz: (answers: { age_range?: string; dating_goal?: string; style?: string; meet_location?: string }) =>
+    apiFetch<{ user: any }>("/auth/quiz", {
+      method: "POST",
+      body: JSON.stringify(answers),
+    }),
 
   // Icebreakers
   categories: () =>
